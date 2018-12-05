@@ -81,6 +81,21 @@ public class Population {
             this.population[individualCount] = individual;
         }
     }
+    /**
+     * Get average fitness
+     *
+     * @return The average individual fitness
+     */
+    public double getAvgFitness(){
+        if (this.populationFitness == -1) {
+            double totalFitness = 0;
+            for (Individual individual : population) {
+                totalFitness += individual.getFitness();
+            }
+            this.populationFitness = totalFitness;
+        }
+        return populationFitness / this.size();
+    }
 
 
 }
