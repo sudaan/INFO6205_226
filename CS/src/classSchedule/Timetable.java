@@ -1,6 +1,8 @@
 package classSchedule;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class Timetable {
     private final HashMap<Integer, Room> rooms;
@@ -8,7 +10,27 @@ public class Timetable {
     private final HashMap<Integer, Module> modules;
     private final HashMap<Integer, Group> groups;
     private final HashMap<Integer, Timeslot> timeslots;
+    private final HashMap<Integer, List<Class>> roomMap;
+    private final HashMap<Integer, List<Class>> profMap;
+    private final HashMap<Integer, List<Class>> moduleMap;
+    private final HashMap<Integer, List<Class>> groupMap;
     private Class classes[];
+
+    public HashMap<Integer, List<Class>> getRoomMap() {
+        return roomMap;
+    }
+
+    public HashMap<Integer, List<Class>> getProfMap() {
+        return profMap;
+    }
+
+    public HashMap<Integer, List<Class>> getModuleMap() {
+        return moduleMap;
+    }
+
+    public HashMap<Integer, List<Class>> getGroupMap() {
+        return groupMap;
+    }
 
     private int numClasses = 0;
 
@@ -22,6 +44,11 @@ public class Timetable {
         this.modules = new HashMap<Integer, Module>();
         this.groups = new HashMap<Integer, Group>();
         this.timeslots = new HashMap<Integer, Timeslot>();
+
+        this.roomMap = new HashMap<>();
+        this.profMap = new HashMap<>();
+        this.moduleMap = new HashMap<>();
+        this.groupMap = new HashMap<>();
     }
 
     public Timetable(Timetable cloneable) {
@@ -30,6 +57,11 @@ public class Timetable {
         this.modules = cloneable.getModules();
         this.groups = cloneable.getGroups();
         this.timeslots = cloneable.getTimeslots();
+
+        this.roomMap = new HashMap<>();
+        this.profMap = new HashMap<>();
+        this.moduleMap = new HashMap<>();
+        this.groupMap = new HashMap<>();
     }
 
     private HashMap<Integer, Group> getGroups() {
@@ -69,6 +101,31 @@ public class Timetable {
 
     public void addProfessor(int professorId, String professorName) {
         this.professors.put(professorId, new Professor(professorId, professorName));
+    }
+
+    /**
+     * Add new professor with preferred room
+     * for soft constraint use
+     * @param professorId
+     * @param professorName
+     * @param preferedroom
+     */
+
+    public void addProfessor(int professorId, String professorName, int preferedroom){
+        this.professors.put(professorId, new Professor(professorId, professorName, preferedroom));
+    }
+
+    /**
+     * Add new professor with preferred room
+     * for soft constraint use
+     * @param professorId
+     * @param professorName
+     * @param preferedroom
+     * @param preferedtime
+     */
+
+    public void addProfessor(int professorId, String professorName, int preferedroom, int preferedtime){
+        this.professors.put(professorId, new Professor(professorId, professorName, preferedroom, preferedtime));
     }
 
     /**
@@ -125,19 +182,33 @@ public class Timetable {
         for (Group group : this.getGroupsAsArray()) {
             int moduleIds[] = group.getModuleIds();
             for (int moduleId : moduleIds) {
-                classes[classIndex] = new Class(classIndex, group.getGroupId(), moduleId);
+
+                Class newClass = new Class(classIndex, group.getGroupId(), moduleId);
 
                 // Add timeslot
-                classes[classIndex].addTimeslot(chromosome[chromosomePos]);
+                newClass.addTimeslot(chromosome[chromosomePos]);
                 chromosomePos++;
 
                 // Add room
-                classes[classIndex].setRoomId(chromosome[chromosomePos]);
+                newClass.setRoomId(chromosome[chromosomePos]);
                 chromosomePos++;
 
                 // Add professor
-                classes[classIndex].addProfessor(chromosome[chromosomePos]);
+                newClass.addProfessor(chromosome[chromosomePos]);
                 chromosomePos++;
+
+                // Add class to maps
+                this.roomMap.putIfAbsent(newClass.getRoomId(), new ArrayList<>());
+                this.groupMap.putIfAbsent(newClass.getGroupId(), new ArrayList<>());
+                this.moduleMap.putIfAbsent(newClass.getModuleId(), new ArrayList<>());
+                this.profMap.putIfAbsent(newClass.getProfessorId(), new ArrayList<>());
+
+                this.roomMap.get(newClass.getRoomId()).add(newClass);
+                this.groupMap.get(newClass.getGroupId()).add(newClass);
+                this.moduleMap.get(newClass.getModuleId()).add(newClass);
+                this.profMap.get(newClass.getProfessorId()).add(newClass);
+
+                classes[classIndex] = newClass;
 
                 classIndex++;
 
@@ -261,29 +332,49 @@ public class Timetable {
      * @return numClashes
      * */
 
-    public int calcClashes() {
-        int clashes = 0;
+    public int calcClashes(int size) {
+        //only hard constranit
+        //int clashes = 0;
+
+        //with soft constraint
+        int clashes = 100;
         for (Class classA : this.classes) {
-            // Check room capacity
+            //  Hard Constraint Check room capacity
             int roomCapacity = this.getRoom(classA.getRoomId()).getRoomCapacity();
             int groupSize = this.getGroup(classA.getGroupId()).getGroupSize();
             if (roomCapacity < groupSize) {
-                clashes++;
+                clashes = clashes-33*size;
             }
 
-            // Check if room is taken
+            // Hard Constraint Check if room is taken
             for (Class classB : this.classes) {
                 if (classA.getRoomId() == classB.getRoomId()&& classA.getTimeslotId() == classB.getTimeslotId()&& classA.getClassId() != classB.getClassId()) {
-                    clashes++;
+                    clashes = clashes-33*size;
                     break;
                 }
             }
 
-            // Check if professor is available
+            // Hard Constraint Check if professor is available
             for (Class classB : this.classes) {
                 if (classA.getProfessorId() == classB.getProfessorId() && classA.getTimeslotId() == classB.getTimeslotId() && classA.getClassId() != classB.getClassId()) {
-                    clashes++;
+                    clashes = clashes-33*size;
                     break;
+                }
+            }
+            // Soft Constraint check if professor perferedroom match room
+            for (Class classB : this.classes) {
+                int tmp_Prof= classB.getProfessorId();
+                int tmp_Room=classB.getRoomId();
+                if (this.getProfessor(tmp_Prof).getPreferedroom()== tmp_Room){
+                    clashes++;
+                }
+            }
+            // Soft Constraint check if professor perferedtime match timeslot
+            for (Class classB : this.classes) {
+                int tmp_Prof= classB.getProfessorId();
+                int tmp_Time=classB.getTimeslotId();
+                if (this.getProfessor(tmp_Prof).getPreferedtime()== tmp_Time){
+                    clashes=clashes+2;
                 }
             }
         }

@@ -1,5 +1,7 @@
 package classSchedule;
 
+import java.util.stream.IntStream;
+
 public class GeneticAlgorithm {
     private int populationSize;
     private double mutationRate;
@@ -21,15 +23,25 @@ public class GeneticAlgorithm {
         threadTimetable.createClasses(individual);
 
         // Calculate fitness
-        int clashes = threadTimetable.calcClashes();
-        double fitness = 1 / (double) (clashes + 1);
+        int clashes = threadTimetable.calcClashes(populationSize);
+        double fitness = (double) (clashes)/100;
         individual.setFitness(fitness);
 
         return fitness;
 
     }
 
+    /**
+     * Evaluate population
+     *
+     * @param population
+     * @param timetable
+     */
     public void evalPopulation(Population population, Timetable timetable) {
+        IntStream.range(0, population.size()).parallel()
+                .forEach(i -> this.calcFitness(population.getIndividual(i),
+                        timetable));
+
         double populationFitness = 0;
         // Loop over population evaluating individuals and summing population
         // fitness
@@ -45,7 +57,7 @@ public class GeneticAlgorithm {
     }
 
     public boolean isTerminationConditionMet(Population population) {
-        return population.getFittest(0).getFitness() == 1.0;
+        return population.getFittest(0).getFitness() >= 100.0;
     }
 
     public Individual selectParent(Population population) {
@@ -101,16 +113,35 @@ public class GeneticAlgorithm {
         return newPopulation;
     }
 
+    /**
+     * Apply mutation to population
+     *
+     * @param population
+     * @param timetable
+     * @return The mutated population
+     */
     public Population mutatePopulation(Population population, Timetable timetable) {
         // Initialize new population
         Population newPopulation = new Population(this.populationSize);
-
+        // Get best fitness
+        double bestFitness = population.getFittest(0).getFitness();
         // Loop over current population by fitness
         for (int populationIndex = 0; populationIndex < population.size(); populationIndex++) {
             Individual individual = population.getFittest(populationIndex);
 
             // Create random individual to swap genes with
             Individual randomIndividual = new Individual(timetable);
+            // Calculate adaptive mutation rate
+            double adaptiveMutationRate = this.mutationRate;
+            if (individual.getFitness() > population.getAvgFitness()) {
+                double fitnessDelta1 = bestFitness - individual.
+                        getFitness();
+                double fitnessDelta2 = bestFitness - population.
+                        getAvgFitness();
+                adaptiveMutationRate = (fitnessDelta1 / fitnessDelta2) *
+                        this.mutationRate;
+            }
+
             // Loop over individual's genes
             for (int geneIndex = 0; geneIndex < individual.getChromosomeLength(); geneIndex++) {
                 // Skip mutation if this is an elite individual
