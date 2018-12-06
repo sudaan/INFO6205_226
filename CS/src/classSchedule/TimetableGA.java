@@ -135,7 +135,7 @@ public class TimetableGA {
         Timetable timetable = initializeTimetable();
 
         // Initialize GA
-        GeneticAlgorithm ga = new GeneticAlgorithm(100, 0.01, 0.9, 2, 5);
+        GeneticAlgorithm ga = new GeneticAlgorithm(1000, 0.01, 0.9, 2, 5);
 
         // TODO: Initialize population
         Population population = ga.initPopulation(timetable);
